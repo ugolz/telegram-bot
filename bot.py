@@ -21,55 +21,13 @@ logger = logging.getLogger(__name__)
 class MarkovChain:
     def __init__(self):
         self.model: dict[str, list[str | None]] = defaultdict(list)
+        self.start_words: list[str] = []
         self.message_count: int = 0
 
     def learn(self, text: str):
-        """Apprende una singola frase."""
-        text = text.strip()
-        if not text:
-            return
-
-        words = text.split()
-        if len(words) < 2:
-            return
-
-        # costruzione catena globale (senza start_words)
-        for i in range(len(words) - 1):
-            self.model[words[i]].append(words[i + 1])
-
-        # fine frase
-        self.model[words[-1]].append(None)
-
         self.message_count += 1
 
     def generate(self, max_words: int = 40) -> str | None:
-        """Genera una frase remixata da tutta la chat."""
-        if not self.model:
-            return None
-
-        # 🔥 parte da QUALSIASI parola del modello (non da un messaggio singolo)
-        word = random.choice(list(self.model.keys()))
-        result = [word]
-
-        for _ in range(max_words - 1):
-
-            # 🔥 salto casuale tra contesti (mix tra messaggi diversi)
-            if random.random() < 0.18:
-                word = random.choice(list(self.model.keys()))
-                result.append(word)
-                continue
-
-            nexts = self.model.get(word)
-            if not nexts:
-                break
-
-            word = random.choice(nexts)
-
-            if word is None:
-                break
-
-            result.append(word)
-
         return " ".join(result)
 
 
@@ -145,10 +103,10 @@ async def cmd_genera(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "👋 Sono il SexySinaBot!\n\n"
-        "Amo Beppe De Rito la nostra pianta preferito.\n\n"
+        "👋 Sono il MarkovBot!\n\n"
+        "Imparo da tutti i messaggi scritti nel gruppo e genero frasi casuali su comando.\n\n"
         "📋 Comandi:\n"
-        "• /pablitooo — genera una frase\n"
+        "• /pablitoo — genera una frase\n"
         "• /f5sualm — statistiche sul modello\n\n"
         "⚙️ Per funzionare correttamente devo essere *admin* del gruppo "
         "(così posso cancellare il messaggio di trigger).",
@@ -186,7 +144,7 @@ async def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("help", cmd_start))
-    app.add_handler(CommandHandler("pablitooo", cmd_genera))
+    app.add_handler(CommandHandler("pablitoo", cmd_genera))
     app.add_handler(CommandHandler("f5sualm", cmd_stats))
 
     logger.info("Bot avviato")
