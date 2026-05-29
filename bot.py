@@ -1,6 +1,7 @@
 import os
 import random
 import logging
+import asyncio
 from collections import defaultdict
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
@@ -14,13 +15,14 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Markov Chain (ordine 1) — una istanza per ogni chat
+# Markov Chain ordine 2
 # ---------------------------------------------------------------------------
 
 class MarkovChain:
     def __init__(self):
-        self.model: dict[str, list[str | None]] = defaultdict(list)
-        self.start_words: list[str] = []
+        # chiave: (parola1, parola2) → lista di parole successive
+        self.model: dict[tuple, list] = defaultdict(list)
+        self.start_pairs: list[tuple] = []
         self.message_count: int = 0
 
     def learn(self, text: str):
@@ -29,28 +31,34 @@ class MarkovChain:
         if not text:
             return
         words = text.split()
-        if len(words) < 2:
+        if len(words) < 3:
             return
-        self.start_words.append(words[0])
-        for i in range(len(words) - 1):
-            self.model[words[i]].append(words[i + 1])
-        self.model[words[-1]].append(None)
+        self.start_pairs.append((words[0], words[1]))
+        for i in range(len(words) - 2):
+            key = (words[i], words[i + 1])
+            self.model[key].append(words[i + 2])
+        # marcatore di fine frase
+        self.model[(words[-2], words[-1])].append(None)
         self.message_count += 1
 
     def generate(self, max_words: int = 40) -> str | None:
-        """Genera una frase. Restituisce None se il modello è vuoto."""
-        if not self.start_words:
+        """Genera una frase casuale. Restituisce None se il modello è vuoto."""
+        if not self.start_pairs:
             return None
-        word = random.choice(self.start_words)
-        result = [word]
-        for _ in range(max_words - 1):
-            nexts = self.model.get(word)
+
+        pair = random.choice(self.start_pairs)
+        result = list(pair)
+
+        for _ in range(max_words - 2):
+            nexts = self.model.get(pair)
             if not nexts:
                 break
-            word = random.choice(nexts)
-            if word is None:
+            next_word = random.choice(nexts)
+            if next_word is None:
                 break
-            result.append(word)
+            result.append(next_word)
+            pair = (pair[1], next_word)
+
         return " ".join(result)
 
 
@@ -68,29 +76,21 @@ def get_chain(chat_id: int) -> MarkovChain:
 # ---------------------------------------------------------------------------
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Ascolta tutti i messaggi di testo e aggiorna il modello."""
     msg = update.message
     if not msg or not msg.text:
         return
-    # Ignora comandi
-    if msg.text.startswith("/"):
-        return
-
-    chain = get_chain(msg.chat_id)
-    chain.learn(msg.text)
+    get_chain(msg.chat_id).learn(msg.text)
 
 
 # ---------------------------------------------------------------------------
-# Handler: /genera
+# Handler: /pablitoo
 # ---------------------------------------------------------------------------
 
 async def cmd_genera(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Cancella il comando e genera una frase Markov."""
     msg = update.message
     if not msg:
         return
 
-    # Prova a cancellare il messaggio di trigger
     try:
         await msg.delete()
     except BadRequest as e:
@@ -98,7 +98,6 @@ async def cmd_genera(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     chain = get_chain(msg.chat_id)
 
-    # Lunghezza opzionale: /genera 80
     max_words = 40
     if context.args:
         try:
@@ -114,14 +113,11 @@ async def cmd_genera(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text="🤔 Non ho ancora abbastanza messaggi da cui imparare. Scrivi un po' nel gruppo!"
         )
     else:
-        await context.bot.send_message(
-            chat_id=msg.chat_id,
-            text=frase
-        )
+        await context.bot.send_message(chat_id=msg.chat_id, text=frase)
 
 
 # ---------------------------------------------------------------------------
-# Handler: /start e /help
+# Handler: /start, /help, /stats
 # ---------------------------------------------------------------------------
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -144,8 +140,8 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         f"📊 *Statistiche*\n\n"
         f"💬 Messaggi appresi: *{chain.message_count}*\n"
-        f"🔑 Token unici: *{len(chain.model)}*\n"
-        f"🔀 Parole iniziali: *{len(chain.start_words)}*",
+        f"🔑 Coppie uniche: *{len(chain.model)}*\n"
+        f"🔀 Coppie iniziali: *{len(chain.start_pairs)}*",
         parse_mode="Markdown"
     )
 
@@ -154,11 +150,8 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Avvio
 # ---------------------------------------------------------------------------
 
-import asyncio
-
 async def main():
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
-
     if not token:
         raise RuntimeError("TELEGRAM_BOT_TOKEN non impostato")
 
@@ -167,7 +160,7 @@ async def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("help", cmd_start))
-    app.add_handler(CommandHandler("genera", cmd_genera))
+    app.add_handler(CommandHandler("pablitoo", cmd_genera))
     app.add_handler(CommandHandler("stats", cmd_stats))
 
     logger.info("Bot avviato")
@@ -176,7 +169,6 @@ async def main():
     await app.start()
     await app.updater.start_polling()
 
-    # 🔥 QUESTO è fondamentale: mantiene vivo il container
     stop_event = asyncio.Event()
     await stop_event.wait()
 
