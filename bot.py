@@ -1,10 +1,10 @@
 import os
+import json
 import pickle
 import random
 import logging
 import asyncio
 import unicodedata
-from collections import defaultdict
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 from telegram.error import BadRequest
@@ -39,7 +39,6 @@ def save_chain(chat_id: int, g: dict):
     except Exception as e:
         logger.warning(f"Errore salvataggio chat {chat_id}: {e}")
 
-# Cache in memoria: chat_id → dict
 chains: dict[int, dict] = {}
 
 def get_chain(chat_id: int) -> dict:
@@ -48,80 +47,99 @@ def get_chain(chat_id: int) -> dict:
     return chains[chat_id]
 
 # ---------------------------------------------------------------------------
-# Caratteri Unicode ammessi (come nell'originale)
+# Caratteri Unicode ammessi
 # ---------------------------------------------------------------------------
 
 ALLOWABLE = {"Lc","Ll","Lm","Lo","Lt","Lu","Nd","Nl","No"}
 
 def normalize_word(w: str) -> str:
-    """Filtra i caratteri non-alfabetici/numerici e porta in minuscolo."""
     return "".join(c for c in w if unicodedata.category(c) in ALLOWABLE).lower()
 
 # ---------------------------------------------------------------------------
-# Logica Markov (ordine 1, stile SexyMarkovBot)
+# Logica Markov
 # ---------------------------------------------------------------------------
 
 def add_message(message: str, g: dict):
-    """
-    Aggiunge un messaggio al modello.
-    Struttura: g[parola_precedente] = [parola_successiva, ...]
-    La chiave "" rappresenta l'inizio/fine frase.
-    """
     words = [""] + message.lower().split() + [""]
     for i in range(1, len(words)):
-        lw = normalize_word(words[i - 1])   # parola precedente (chiave)
-        nw = words[i]                        # parola successiva (valore)
+        lw = normalize_word(words[i - 1])
+        nw = words[i]
         if len(lw) < 50 and len(nw) < 50:
             if lw not in g:
                 g[lw] = []
             g[lw].append(nw)
 
 def generate(g: dict, max_words: int = 50) -> str | None:
-    """
-    Genera una frase con logica ibrida:
-    - 50%: parte da una parola casuale qualsiasi nel vocabolario
-    - 50%: parte dall'inizio frase ("") come nell'originale
-    """
     if "" not in g:
         return None
-
     for _ in range(1000):
         words = []
-
-        # scegli punto di partenza
         if random.randint(0, 10) < 5:
-            # parte da una parola casuale del vocabolario
             word = random.choice([k for k in g.keys() if isinstance(k, str)])
         else:
-            # parte dall'inizio frase
             word = random.choice(g[""])
-
         while word != "" and len(words) < max_words:
             words.append(word)
             key = normalize_word(word)
             if key not in g:
                 break
             word = random.choice(g[key])
-
         msg = " ".join(words)
         if len(msg) > 0:
             return msg
-
     return None
+
+# ---------------------------------------------------------------------------
+# Caricamento cronologia Telegram (JSON export)
+# ---------------------------------------------------------------------------
+
+def load_history_json(path: str, chat_id: int) -> int:
+    """Legge result.json di Telegram Desktop e popola il modello."""
+    g = get_chain(chat_id)
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception as e:
+        logger.error(f"Impossibile leggere {path}: {e}")
+        return 0
+
+    raw = data.get("messages", data) if isinstance(data, dict) else data
+    count = 0
+    for msg in raw:
+        if not isinstance(msg, dict):
+            continue
+        text = msg.get("text", "")
+        if isinstance(text, list):
+            text = "".join(
+                part if isinstance(part, str) else part.get("text", "")
+                for part in text
+            )
+        text = text.strip()
+        if text and not text.startswith("/"):
+            add_message(text, g)
+            count += 1
+
+    save_chain(chat_id, g)
+    logger.info(f"Cronologia caricata: {count} messaggi da {path}")
+    return count
 
 # ---------------------------------------------------------------------------
 # Handler: apprende da ogni messaggio
 # ---------------------------------------------------------------------------
 
+PAUSED: set[int] = set()
+msg_counters: dict[int, int] = {}
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
     if not msg or not msg.text:
         return
+    if msg.chat_id in PAUSED:
+        return
     g = get_chain(msg.chat_id)
     add_message(msg.text, g)
-    # salva ogni 20 messaggi circa per non stressare il disco
-    msg_count = sum(len(v) for v in g.values())
-    if msg_count % 20 == 0:
+    msg_counters[msg.chat_id] = msg_counters.get(msg.chat_id, 0) + 1
+    if msg_counters[msg.chat_id] % 20 == 0:
         save_chain(msg.chat_id, g)
 
 # ---------------------------------------------------------------------------
@@ -132,14 +150,12 @@ async def cmd_genera(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
     if not msg:
         return
-
     try:
         await msg.delete()
     except BadRequest as e:
         logger.warning(f"Non riesco a cancellare il messaggio: {e}")
 
     g = get_chain(msg.chat_id)
-
     max_words = 50
     if context.args:
         try:
@@ -148,7 +164,6 @@ async def cmd_genera(update: Update, context: ContextTypes.DEFAULT_TYPE):
             pass
 
     frase = generate(g, max_words=max_words)
-
     if frase is None:
         await context.bot.send_message(
             chat_id=msg.chat_id,
@@ -158,31 +173,54 @@ async def cmd_genera(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(chat_id=msg.chat_id, text=frase)
 
 # ---------------------------------------------------------------------------
-# Handler: /markovclear (solo admin)
+# Handler: /carica — carica la cronologia dal JSON
 # ---------------------------------------------------------------------------
 
-async def cmd_clear(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def cmd_carica(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
-    chat_id = msg.chat_id
-
-    # verifica che sia admin
+    # solo admin
     try:
-        member = await context.bot.get_chat_member(chat_id, msg.from_user.id)
+        member = await context.bot.get_chat_member(msg.chat_id, msg.from_user.id)
         if member.status not in ("administrator", "creator"):
             await msg.reply_text("⛔ Solo gli admin possono usare questo comando.")
             return
     except Exception:
         pass
 
-    chains[chat_id] = {}
-    save_chain(chat_id, {})
+    path = os.environ.get("CORPUS_PATH", "result.json")
+    if not os.path.exists(path):
+        await msg.reply_text(
+            f"❌ File non trovato: `{path}`\n"
+            "Imposta la variabile d'ambiente `CORPUS_PATH` con il percorso del file JSON.",
+            parse_mode="Markdown"
+        )
+        return
+
+    await msg.reply_text("⏳ Caricamento cronologia in corso…")
+    count = load_history_json(path, msg.chat_id)
+    g = get_chain(msg.chat_id)
+    await msg.reply_text(
+        f"✅ Caricati *{count}* messaggi dalla cronologia!\n"
+        f"🔑 Parole uniche nel modello: *{len(g)}*",
+        parse_mode="Markdown"
+    )
+
+# ---------------------------------------------------------------------------
+# Handler: /markovclear, /markovpause, /markovresume
+# ---------------------------------------------------------------------------
+
+async def cmd_clear(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.message
+    try:
+        member = await context.bot.get_chat_member(msg.chat_id, msg.from_user.id)
+        if member.status not in ("administrator", "creator"):
+            await msg.reply_text("⛔ Solo gli admin possono usare questo comando.")
+            return
+    except Exception:
+        pass
+    chains[msg.chat_id] = {}
+    save_chain(msg.chat_id, {})
     await msg.reply_text("🗑️ Modello azzerato.")
-
-# ---------------------------------------------------------------------------
-# Handler: /markovpause e /markovresume (solo admin)
-# ---------------------------------------------------------------------------
-
-PAUSED: set[int] = set()
 
 async def cmd_pause(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
@@ -219,6 +257,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "📋 Comandi:\n"
         "• /pablitoo — genera una frase\n"
         "• /pablitoo 80 — genera una frase (max 80 parole)\n"
+        "• /carica — carica la cronologia dal JSON export (solo admin)\n"
         "• /stats — statistiche sul modello\n"
         "• /markovclear — azzera il modello (solo admin)\n"
         "• /markovpause — pausa raccolta (solo admin)\n"
@@ -232,11 +271,11 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not g:
         await update.message.reply_text("📊 Nessun messaggio appreso finora.")
         return
-    total_transitions = sum(len(v) for v in g.values())
+    total = sum(len(v) for v in g.values())
     await update.message.reply_text(
         f"📊 *Statistiche*\n\n"
         f"🔑 Parole uniche: *{len(g)}*\n"
-        f"🔀 Transizioni totali: *{total_transitions}*\n"
+        f"🔀 Transizioni totali: *{total}*\n"
         f"⏸️ Pausa: *{'sì' if update.message.chat_id in PAUSED else 'no'}*",
         parse_mode="Markdown"
     )
@@ -252,20 +291,15 @@ async def main():
 
     app = ApplicationBuilder().token(token).build()
 
-    # apprende solo se non in pausa
-    async def handle_message_paused(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if update.message and update.message.chat_id in PAUSED:
-            return
-        await handle_message(update, context)
-
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message_paused))
-    app.add_handler(CommandHandler("start",         cmd_start))
-    app.add_handler(CommandHandler("help",          cmd_start))
-    app.add_handler(CommandHandler("pablitoo",      cmd_genera))
-    app.add_handler(CommandHandler("stats",         cmd_stats))
-    app.add_handler(CommandHandler("markovclear",   cmd_clear))
-    app.add_handler(CommandHandler("markovpause",   cmd_pause))
-    app.add_handler(CommandHandler("markovresume",  cmd_resume))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    app.add_handler(CommandHandler("start",        cmd_start))
+    app.add_handler(CommandHandler("help",         cmd_start))
+    app.add_handler(CommandHandler("pablitoo",     cmd_genera))
+    app.add_handler(CommandHandler("carica",       cmd_carica))
+    app.add_handler(CommandHandler("stats",        cmd_stats))
+    app.add_handler(CommandHandler("markovclear",  cmd_clear))
+    app.add_handler(CommandHandler("markovpause",  cmd_pause))
+    app.add_handler(CommandHandler("markovresume", cmd_resume))
 
     logger.info("Bot avviato")
     await app.initialize()
