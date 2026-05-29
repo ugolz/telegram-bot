@@ -155,8 +155,9 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Avvio
 # ---------------------------------------------------------------------------
 
-async def main():
+def main():
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
+
     if not token:
         raise RuntimeError(
             "Variabile d'ambiente TELEGRAM_BOT_TOKEN non impostata.\n"
@@ -166,7 +167,12 @@ async def main():
     app = ApplicationBuilder().token(token).build()
 
     # Apprende da tutti i messaggi di testo (non comandi)
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    app.add_handler(
+        MessageHandler(
+            filters.TEXT & ~filters.COMMAND,
+            handle_message
+        )
+    )
 
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("help", cmd_start))
@@ -174,9 +180,9 @@ async def main():
     app.add_handler(CommandHandler("stats", cmd_stats))
 
     logger.info("MarkovBot avviato. In ascolto…")
-    await app.run_polling()
+
+    app.run_polling(drop_pending_updates=True)
 
 
 if __name__ == "__main__":
-    import asyncio
-    asyncio.run(main())
+    main()
