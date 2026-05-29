@@ -163,7 +163,7 @@ gc_counter = gc_every_unload
 last_msg_id = 0
 
 def addMessage(message, g):
-    w = [""] + message.lower().split(" ") + [""]
+    w = [""] + message.lower().split(" ")
     for i in range(1,len(w)):
         lw = "".join(filter(lambda x:(unicodedata.category(x) in ALLOWABLE),w[i-1]))
         nw = w[i]
