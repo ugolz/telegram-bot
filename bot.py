@@ -73,13 +73,13 @@ class MarkovChain:
         return " ".join(result)
 
 
-    # Dizionario chat_id → MarkovChain
-    chains: dict[int, MarkovChain] = {}
+# Dizionario chat_id → MarkovChain
+chains: dict[int, MarkovChain] = {}
 
-    def get_chain(chat_id: int) -> MarkovChain:
-        if chat_id not in chains:
-            chains[chat_id] = MarkovChain()
-        return chains[chat_id]
+def get_chain(chat_id: int) -> MarkovChain:
+    if chat_id not in chains:
+        chains[chat_id] = MarkovChain()
+    return chains[chat_id]
 
 
 # ---------------------------------------------------------------------------
@@ -148,8 +148,8 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "👋 Sono il SexySinaBot!\n\n"
         "Amo Beppe De Rito la nostra pianta preferito.\n\n"
         "📋 Comandi:\n"
-        "• /Pablitooo — genera una frase\n"
-        "• /F5SuALM — statistiche sul modello\n\n"
+        "• /pablitooo — genera una frase\n"
+        "• /f5sualm — statistiche sul modello\n\n"
         "⚙️ Per funzionare correttamente devo essere *admin* del gruppo "
         "(così posso cancellare il messaggio di trigger).",
         parse_mode="Markdown"
@@ -186,8 +186,8 @@ async def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("help", cmd_start))
-    app.add_handler(CommandHandler("Pablitooo", cmd_genera))
-    app.add_handler(CommandHandler("F5SuALM", cmd_stats))
+    app.add_handler(CommandHandler("pablitooo", cmd_genera))
+    app.add_handler(CommandHandler("f5sualm", cmd_stats))
 
     logger.info("Bot avviato")
 
