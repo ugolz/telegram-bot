@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 class MarkovChain:
-   def __init__(self):
+    def __init__(self):
         self.model: dict[str, list[str | None]] = defaultdict(list)
         self.start_words: list[str] = []
         self.message_count: int = 0
@@ -129,7 +129,8 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "👋 Sono il MarkovBot!\n\n"
         "Imparo da tutti i messaggi scritti nel gruppo e genero frasi casuali su comando.\n\n"
         "📋 Comandi:\n"
-        "• /pablitoo — genera una frase\n"
+        "• /genera — genera una frase\n"
+        "• /genera 80 — genera una frase (max 80 parole)\n"
         "• /stats — statistiche sul modello\n\n"
         "⚙️ Per funzionare correttamente devo essere *admin* del gruppo "
         "(così posso cancellare il messaggio di trigger).",
@@ -169,7 +170,7 @@ async def main():
 
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("help", cmd_start))
-    app.add_handler(CommandHandler("pablitoo", cmd_genera))
+    app.add_handler(CommandHandler("genera", cmd_genera))
     app.add_handler(CommandHandler("stats", cmd_stats))
 
     logger.info("MarkovBot avviato. In ascolto…")
