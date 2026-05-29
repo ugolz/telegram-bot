@@ -1,6 +1,7 @@
 import os
 import random
 import logging
+import asyncio
 from collections import defaultdict
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
@@ -155,34 +156,26 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Avvio
 # ---------------------------------------------------------------------------
 
-def main():
+async def main():
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
 
     if not token:
-        raise RuntimeError(
-            "Variabile d'ambiente TELEGRAM_BOT_TOKEN non impostata.\n"
-            "Esegui: export TELEGRAM_BOT_TOKEN='il_tuo_token'"
-        )
+        raise RuntimeError("TELEGRAM_BOT_TOKEN non impostato")
 
     app = ApplicationBuilder().token(token).build()
 
-    # Apprende da tutti i messaggi di testo (non comandi)
-    app.add_handler(
-        MessageHandler(
-            filters.TEXT & ~filters.COMMAND,
-            handle_message
-        )
-    )
-
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("help", cmd_start))
     app.add_handler(CommandHandler("genera", cmd_genera))
     app.add_handler(CommandHandler("stats", cmd_stats))
 
-    logger.info("MarkovBot avviato. In ascolto…")
+    logger.info("Bot avviato (manual async mode)")
 
-    app.run_polling(drop_pending_updates=True)
+    # 🔥 INIT MANUALE (evita run_polling)
+    await app.initialize()
+    await app.start()
+    await app.updater.start_polling()
 
-
-if __name__ == "__main__":
-    main()
+    # Tiene vivo il bot
+    await asyncio.Event().wait()
