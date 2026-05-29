@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 class MarkovChain:
-    def **init**(self):
+    def __init__(self):
         self.model: dict[str, list[str | None]] = defaultdict(list)
         self.message_count: int = 0
 
