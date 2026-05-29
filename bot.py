@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 class MarkovChain:
-    def __init__(self):
+   def __init__(self):
         self.model: dict[str, list[str | None]] = defaultdict(list)
         self.start_words: list[str] = []
         self.message_count: int = 0
@@ -129,8 +129,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "👋 Sono il MarkovBot!\n\n"
         "Imparo da tutti i messaggi scritti nel gruppo e genero frasi casuali su comando.\n\n"
         "📋 Comandi:\n"
-        "• /genera — genera una frase\n"
-        "• /genera 80 — genera una frase (max 80 parole)\n"
+        "• /pablitoo — genera una frase\n"
         "• /stats — statistiche sul modello\n\n"
         "⚙️ Per funzionare correttamente devo essere *admin* del gruppo "
         "(così posso cancellare il messaggio di trigger).",
@@ -155,28 +154,32 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Avvio
 # ---------------------------------------------------------------------------
 
+import asyncio
+
 async def main():
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
+
     if not token:
-        raise RuntimeError(
-            "Variabile d'ambiente TELEGRAM_BOT_TOKEN non impostata.\n"
-            "Esegui: export TELEGRAM_BOT_TOKEN='il_tuo_token'"
-        )
+        raise RuntimeError("TELEGRAM_BOT_TOKEN non impostato")
 
     app = ApplicationBuilder().token(token).build()
 
-    # Apprende da tutti i messaggi di testo (non comandi)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("help", cmd_start))
     app.add_handler(CommandHandler("genera", cmd_genera))
     app.add_handler(CommandHandler("stats", cmd_stats))
 
-    logger.info("MarkovBot avviato. In ascolto…")
-    await app.run_polling()
+    logger.info("Bot avviato")
+
+    await app.initialize()
+    await app.start()
+    await app.updater.start_polling()
+
+    # 🔥 QUESTO è fondamentale: mantiene vivo il container
+    stop_event = asyncio.Event()
+    await stop_event.wait()
 
 
 if __name__ == "__main__":
-    import asyncio
     asyncio.run(main())
