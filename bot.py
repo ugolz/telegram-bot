@@ -156,6 +156,8 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Avvio
 # ---------------------------------------------------------------------------
 
+import asyncio
+
 async def main():
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
 
@@ -170,12 +172,15 @@ async def main():
     app.add_handler(CommandHandler("genera", cmd_genera))
     app.add_handler(CommandHandler("stats", cmd_stats))
 
-    logger.info("Bot avviato (manual async mode)")
+    logger.info("Bot avviato")
 
-    # 🔥 INIT MANUALE (evita run_polling)
     await app.initialize()
     await app.start()
     await app.updater.start_polling()
 
-    # Tiene vivo il bot
-    await asyncio.Event().wait()
+    stop_event = asyncio.Event()
+    await stop_event.wait()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
