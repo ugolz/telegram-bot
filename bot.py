@@ -155,7 +155,7 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Avvio
 # ---------------------------------------------------------------------------
 
-def main():
+async def main():
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
     if not token:
         raise RuntimeError(
@@ -174,8 +174,9 @@ def main():
     app.add_handler(CommandHandler("stats", cmd_stats))
 
     logger.info("MarkovBot avviato. In ascolto…")
-    app.run_polling()
+    await app.run_polling()
 
 
 if __name__ == "__main__":
-    main()
+    import asyncio
+    asyncio.run(main())
