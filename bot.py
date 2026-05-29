@@ -1,7 +1,6 @@
 import os
 import random
 import logging
-import asyncio
 from collections import defaultdict
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
@@ -131,7 +130,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Imparo da tutti i messaggi scritti nel gruppo e genero frasi casuali su comando.\n\n"
         "📋 Comandi:\n"
         "• /pablitoo — genera una frase\n"
-        "• /f5sualm — statistiche sul modello\n\n"
+        "• /stats — statistiche sul modello\n\n"
         "⚙️ Per funzionare correttamente devo essere *admin* del gruppo "
         "(così posso cancellare il messaggio di trigger).",
         parse_mode="Markdown"
@@ -155,31 +154,28 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Avvio
 # ---------------------------------------------------------------------------
 
-import asyncio
-
 async def main():
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
-
     if not token:
-        raise RuntimeError("TELEGRAM_BOT_TOKEN non impostato")
+        raise RuntimeError(
+            "Variabile d'ambiente TELEGRAM_BOT_TOKEN non impostata.\n"
+            "Esegui: export TELEGRAM_BOT_TOKEN='il_tuo_token'"
+        )
 
     app = ApplicationBuilder().token(token).build()
 
+    # Apprende da tutti i messaggi di testo (non comandi)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("help", cmd_start))
     app.add_handler(CommandHandler("pablitoo", cmd_genera))
-    app.add_handler(CommandHandler("f5sualm", cmd_stats))
+    app.add_handler(CommandHandler("stats", cmd_stats))
 
-    logger.info("Bot avviato")
-
-    await app.initialize()
-    await app.start()
-    await app.updater.start_polling()
-
-    stop_event = asyncio.Event()
-    await stop_event.wait()
+    logger.info("MarkovBot avviato. In ascolto…")
+    await app.run_polling()
 
 
 if __name__ == "__main__":
+    import asyncio
     asyncio.run(main())
