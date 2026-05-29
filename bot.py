@@ -19,15 +19,39 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 class MarkovChain:
-    def __init__(self):
+   def __init__(self):
         self.model: dict[str, list[str | None]] = defaultdict(list)
         self.start_words: list[str] = []
         self.message_count: int = 0
 
     def learn(self, text: str):
+        """Apprende una singola frase."""
+        text = text.strip()
+        if not text:
+            return
+        words = text.split()
+        if len(words) < 2:
+            return
+        self.start_words.append(words[0])
+        for i in range(len(words) - 1):
+            self.model[words[i]].append(words[i + 1])
+        self.model[words[-1]].append(None)
         self.message_count += 1
 
     def generate(self, max_words: int = 40) -> str | None:
+        """Genera una frase. Restituisce None se il modello è vuoto."""
+        if not self.start_words:
+            return None
+        word = random.choice(self.start_words)
+        result = [word]
+        for _ in range(max_words - 1):
+            nexts = self.model.get(word)
+            if not nexts:
+                break
+            word = random.choice(nexts)
+            if word is None:
+                break
+            result.append(word)
         return " ".join(result)
 
 
