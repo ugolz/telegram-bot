@@ -163,7 +163,7 @@ gc_counter = gc_every_unload
 last_msg_id = 0
 
 def addMessage(message, g):
-    w = [""] + message.lower().split(" ")
+    w = [""] + message.lower().split(" ") + [""]
     for i in range(1,len(w)):
         lw = "".join(filter(lambda x:(unicodedata.category(x) in ALLOWABLE),w[i-1]))
         nw = w[i]
@@ -315,11 +315,11 @@ try:
                             tries_o += 1
                             words = []
                             word = ""
-                            if random.randint(0,10) < 5:
+                            if random.randint(0,10) < 9:
                                 word = random.choice(list(filter(lambda x:type(x)==str, g.keys())))
                             else:
                                 word = random.choice(g[word])
-                            while word != "" and len(words) < min(g[4], 100):
+                            while word != "" and len(words) < min(g[4], 30):
                                 words.append(word)
                                 word = "".join(filter(lambda x:(unicodedata.category(x) in ALLOWABLE), word)).lower()
                                 if word not in g.keys():
