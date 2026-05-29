@@ -304,6 +304,11 @@ try:
                     if cmdtarget.lower() != MY_USERNAME:
                         continue
                 cmd = rcmd.lower()
+                if cmd == "/f5sualm":
+                    try:
+                        bot.sendMessage(chat_id=chat_id, text="😤")
+                    except:
+                        pass
                 if cmd == "/markov" or cmd == "/pablitoo":
                     if t in LAST_USER.keys():
                         if (curtime - LAST_USER[t]) < g[0]:
@@ -346,7 +351,7 @@ try:
                             bot.sendMessage(chat_id=chat_id, text="[Chain is empty]", reply_to_message_id=replyto)
                         except:
                             pass
-                if cmd == "/markovclear":
+                if cmd == "/pablitoclear" or cmd == "/markovclear":
                     if t in LAST_USER.keys():
                         if (curtime - LAST_USER[t]) < 1:
                             continue
@@ -368,7 +373,7 @@ try:
                         bot.sendMessage(chat_id=chat_id, text="[Messages cleared]", reply_to_message_id=replyto)
                     else:
                         bot.sendMessage(chat_id=chat_id, text="[Copy this to confirm]\n/markovclear " + checkhash, reply_to_message_id=replyto)
-                if cmd == "/markovpause":
+                if cmd == "/pablitopause" or cmd == "/markovpause":
                     try:
                         st = bot.getChatMember(chat_id=chat_id, user_id=user).result.status
                         if chat_type in ["group","supergroup","channel"] and not admbypass and (st != "administrator" and st != "creator"):
@@ -378,7 +383,7 @@ try:
                     g[3] = False
                     save_group(chat_id)
                     bot.sendMessage(chat_id=chat_id, text="[Reading paused]", reply_to_message_id=replyto)
-                if cmd == "/markovresume":
+                if cmd == "/pablitoresume" or cmd == "/markovresume":
                     try:
                         st = bot.getChatMember(chat_id=chat_id, user_id=user).result.status
                         if chat_type in ["group","supergroup","channel"] and not admbypass and (st != "administrator" and st != "creator"):
@@ -388,7 +393,7 @@ try:
                     g[3] = True
                     save_group(chat_id)
                     bot.sendMessage(chat_id=chat_id, text="[Reading resumed]", reply_to_message_id=replyto)
-                if cmd == "/markovmaxwords":
+                if cmd == "/pablitomaxwords" or cmd == "/markovmaxwords":
                     try:
                         st = bot.getChatMember(chat_id=chat_id, user_id=user).result.status
                         if chat_type in ["group","supergroup","channel"] and not admbypass and (st != "administrator" and st != "creator"):
