@@ -217,6 +217,14 @@ def save_group(chat_id):
     except:
         pass
 
+
+def delete_message(chat_id, message_id):
+    try:
+        del_url = f"https://api.telegram.org/bot{T}/deleteMessage?chat_id={chat_id}&message_id={message_id}"
+        urllib.request.urlopen(urllib.request.Request(del_url, headers={'User-Agent': UA}), timeout=10)
+    except:
+        pass
+
 tried_to = 0
 saferes = True
 OFF = 0
@@ -304,6 +312,7 @@ try:
                     if cmdtarget.lower() != MY_USERNAME:
                         continue
                 cmd = rcmd.lower()
+                delete_message(chat_id, replyto)
                 if cmd == "/f5sualm":
                     try:
                         bot.sendMessage(chat_id=chat_id, text="😤")
@@ -334,12 +343,7 @@ try:
                             msg = " ".join(words)
                             if len(msg) > 0: break
                             if tries_o > 1000: break
-                        # cancella il messaggio di trigger
-                        try:
-                            del_url = f"https://api.telegram.org/bot{T}/deleteMessage?chat_id={chat_id}&message_id={replyto}"
-                            urllib.request.urlopen(urllib.request.Request(del_url, headers={'User-Agent': UA}), timeout=10)
-                        except:
-                            pass
+
                         try:
                             bot.sendMessage(chat_id=chat_id, text=msg)
                         except KeyboardInterrupt as e:
