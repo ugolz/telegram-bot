@@ -154,7 +154,7 @@ bot = TelegramBot(T)
 MY_USERNAME = bot.getMe().result.username.lower()
 
 # Crea la cartella markov se non esiste
-os.makedirs("markov", exist_ok=True)
+os.makedirs("/app/markov", exist_ok=True)
 
 gcache = []
 max_cache_size = 10
@@ -179,7 +179,7 @@ def limit(s):
 def load_group(chat_id):
     global gcache
     try:
-        with open("markov/chat_" + str(chat_id) + ".dat", "rb") as f:
+        with open("/app/markov/chat_" + str(chat_id) + ".dat", "rb") as f:
             groups[chat_id] = pickle.load(f)
         gcache.append(chat_id)
     except KeyboardInterrupt as e:
@@ -196,7 +196,7 @@ def check_cache():
 def unload_group(chat_id):
     global gcache, gc_counter
     try:
-        with open("markov/chat_" + str(chat_id) + ".dat", "wb") as f:
+        with open("/app/markov/chat_" + str(chat_id) + ".dat", "wb") as f:
             pickle.dump(groups[chat_id], f)
             groups[chat_id] = None
             del groups[chat_id]
@@ -212,7 +212,7 @@ def unload_group(chat_id):
 
 def save_group(chat_id):
     try:
-        with open("markov/chat_" + str(chat_id) + ".dat", "wb") as f:
+        with open("/app/markov/chat_" + str(chat_id) + ".dat", "wb") as f:
             pickle.dump(groups[chat_id], f)
     except:
         pass
@@ -263,7 +263,7 @@ try:
                 if oid in gcache:
                     unload_group(oid)
                 try:
-                    os.rename("markov/chat_" + str(oid) + ".dat", "markov/chat_" + str(nid) + ".dat")
+                    os.rename("/app/markov/chat_" + str(oid) + ".dat", "/app/markov/chat_" + str(nid) + ".dat")
                 except:
                     pass
                 continue
@@ -312,8 +312,8 @@ try:
                     if cmdtarget.lower() != MY_USERNAME:
                         continue
                 cmd = rcmd.lower()
-                delete_message(chat_id, replyto)
                 if cmd == "/f5sualm":
+                    delete_message(chat_id, replyto)
                     try:
                         bot.sendMessage(chat_id=chat_id, text="😤")
                     except:
@@ -323,6 +323,7 @@ try:
                         if (curtime - LAST_USER[t]) < g[0]:
                             continue
                     LAST_USER[t] = curtime
+                    delete_message(chat_id, replyto)
                     tries_o = 0
                     if "" in g.keys():
                         while True:
@@ -352,7 +353,7 @@ try:
                             pass
                     else:
                         try:
-                            bot.sendMessage(chat_id=chat_id, text="[Chain is empty]", reply_to_message_id=replyto)
+                            bot.sendMessage(chat_id=chat_id, text="[Chain is empty]")
                         except:
                             pass
                 if cmd == "/pablitoclear" or cmd == "/markovclear":
@@ -374,9 +375,9 @@ try:
                     if what == checkhash:
                         groups[chat_id] = {}
                         save_group(chat_id)
-                        bot.sendMessage(chat_id=chat_id, text="[Messages cleared]", reply_to_message_id=replyto)
+                        bot.sendMessage(chat_id=chat_id, text="[Messages cleared]")
                     else:
-                        bot.sendMessage(chat_id=chat_id, text="[Copy this to confirm]\n/markovclear " + checkhash, reply_to_message_id=replyto)
+                        bot.sendMessage(chat_id=chat_id, text="[Copy this to confirm]\n/markovclear " + checkhash)
                 if cmd == "/pablitopause" or cmd == "/markovpause":
                     try:
                         st = bot.getChatMember(chat_id=chat_id, user_id=user).result.status
@@ -386,7 +387,7 @@ try:
                         pass
                     g[3] = False
                     save_group(chat_id)
-                    bot.sendMessage(chat_id=chat_id, text="[Reading paused]", reply_to_message_id=replyto)
+                    bot.sendMessage(chat_id=chat_id, text="[Reading paused]")
                 if cmd == "/pablitoresume" or cmd == "/markovresume":
                     try:
                         st = bot.getChatMember(chat_id=chat_id, user_id=user).result.status
@@ -396,7 +397,7 @@ try:
                         pass
                     g[3] = True
                     save_group(chat_id)
-                    bot.sendMessage(chat_id=chat_id, text="[Reading resumed]", reply_to_message_id=replyto)
+                    bot.sendMessage(chat_id=chat_id, text="[Reading resumed]")
                 if cmd == "/pablitomaxwords" or cmd == "/markovmaxwords":
                     try:
                         st = bot.getChatMember(chat_id=chat_id, user_id=user).result.status
@@ -406,19 +407,19 @@ try:
                         pass
                     t2 = " ".join(message.split(" ")[1:]).strip()
                     if len(t2) < 1:
-                        bot.sendMessage(chat_id=chat_id, text="[Usage: /markovmaxwords words]", reply_to_message_id=replyto)
+                        bot.sendMessage(chat_id=chat_id, text="[Usage: /markovmaxwords words]")
                         continue
                     try:
                         v = int(t2)
                     except:
-                        bot.sendMessage(chat_id=chat_id, text="[Usage: /markovmaxwords words]", reply_to_message_id=replyto)
+                        bot.sendMessage(chat_id=chat_id, text="[Usage: /markovmaxwords words]")
                         continue
                     if v < 1 or v > 120:
-                        bot.sendMessage(chat_id=chat_id, text="[Limit for words is 1-120]", reply_to_message_id=replyto)
+                        bot.sendMessage(chat_id=chat_id, text="[Limit for words is 1-120]")
                         continue
                     g[4] = v
                     save_group(chat_id)
-                    bot.sendMessage(chat_id=chat_id, text="[Maximum words set]", reply_to_message_id=replyto)
+                    bot.sendMessage(chat_id=chat_id, text="[Maximum words set]")
             elif message[0] != "/":
                 if g[3]:
                     if SPLIT_LINES:
